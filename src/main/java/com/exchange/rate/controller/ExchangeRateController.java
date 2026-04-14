@@ -1,5 +1,6 @@
 package com.exchange.rate.controller;
 
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +17,7 @@ public class ExchangeRateController {
 		this.dataStore = dataStore;
 	}
 	
-	@GetMapping("/data/{resourceType}")
+	@GetMapping(value = "/data/{resourceType}", produces = MediaType.APPLICATION_JSON_VALUE)
     public Object getExchangeRate(@PathVariable String resourceType) {
         return dataStore.get(resourceType);
     }
