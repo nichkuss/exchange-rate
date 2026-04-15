@@ -69,6 +69,8 @@ public class LatestIdrRatesStrategy implements ExchangeRateFetcherImpl {
 			JsonNode root = objectMapper.readTree(response);
 			double rateUsd = root.path("rates").path("USD").asDouble();
 			double spreadFactor = calculateSpreadFactor(githubUsername);
+			logger.info("[fetchData] Spread Factor: " + spreadFactor);
+			
 	        double usdBuySpreadIdr = (1.0 / rateUsd) * (1 + spreadFactor);
 
 	        ObjectNode result = objectMapper.createObjectNode();
