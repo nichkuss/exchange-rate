@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.exchange.rate.exceptions.FrankfurterApiException;
 import com.exchange.rate.strategies.impl.ExchangeRateFetcherImpl;
 
 import reactor.core.publisher.Mono;
@@ -40,23 +41,26 @@ public class LatestIdrRatesStrategy implements ExchangeRateFetcherImpl {
 	}
 	
 	@Override
-	public Object fetchData() {	
+	public Object fetchData() {			
 		String response = webClient.get()
-		        .uri("/v1/latest?base=IDR")
-		        .retrieve()
-		        .onStatus(status -> status.isError(), clientResponse ->
-		            clientResponse.bodyToMono(String.class)
-		                .defaultIfEmpty("No error body")
-		                .map(body -> new RuntimeException(
-		                    "API Error: " + clientResponse.statusCode() + " - " + body
-		                ))
-		        )
-		        .bodyToMono(String.class)
-		        .onErrorResume(e -> {
-		            logger.error("[fetchData] API call failed", e);
-		            return Mono.empty();
-		        })
-		        .block();
+			    .uri("/v1/latest?base=IDR")
+			    .retrieve()
+			    .onStatus(
+			        status -> status.is4xxClientError() || status.is5xxServerError(),
+			        clientResponse -> clientResponse.bodyToMono(String.class)
+			            .defaultIfEmpty("No error body")
+			            .flatMap(body -> Mono.<Throwable>error(
+			                new FrankfurterApiException(
+			                    "API error: " + clientResponse.statusCode() + " - " + body
+			                )
+			            ))
+			    )
+			    .bodyToMono(String.class)
+			    .onErrorMap(ex -> {
+			        logger.error("[fetchData] API call failed", ex);
+			        return new FrankfurterApiException("External API failure", ex);
+			    })
+			    .block();
 		
 		logger.info("[fetchData] API RESPONSE: " + response);
 		
