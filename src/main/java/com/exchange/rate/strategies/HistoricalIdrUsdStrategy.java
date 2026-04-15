@@ -20,6 +20,7 @@ import java.util.Map;
 
 import reactor.core.publisher.Mono;
 
+import com.exchange.rate.exceptions.FrankfurterApiException;
 import com.exchange.rate.strategies.impl.ExchangeRateFetcherImpl;
 import static com.exchange.rate.constants.Constants.*;
 
@@ -44,18 +45,21 @@ public class HistoricalIdrUsdStrategy implements ExchangeRateFetcherImpl {
 		String response = webClient.get()
 		        .uri("/v1/2024-01-01..2024-01-05?from=IDR&to=USD")
 		        .retrieve()
-		        .onStatus(status -> status.isError(), clientResponse ->
-		            clientResponse.bodyToMono(String.class)
-		                .defaultIfEmpty("No error body")
-		                .map(body -> new RuntimeException(
-		                    "API Error: " + clientResponse.statusCode() + " - " + body
-		                ))
-		        )
+		        .onStatus(
+				        status -> status.is4xxClientError() || status.is5xxServerError(),
+				        clientResponse -> clientResponse.bodyToMono(String.class)
+				            .defaultIfEmpty("No error body")
+				            .flatMap(body -> Mono.<Throwable>error(
+				                new FrankfurterApiException(
+				                    "API error: " + clientResponse.statusCode() + " - " + body
+				                )
+				            ))
+				    )
 		        .bodyToMono(String.class)
-		        .onErrorResume(e -> {
-		            logger.error("[fetchData] API call failed", e);
-		            return Mono.empty();
-		        })
+		        .onErrorMap(ex -> {
+			        logger.error("[fetchData] API call failed", ex);
+			        return new FrankfurterApiException("External API failure", ex);
+			    })
 		        .block();
 		
 		logger.info("[fetchData] API RESPONSE: " + response);
